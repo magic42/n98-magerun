@@ -22,6 +22,11 @@ class Exec
     const CODE_CLEAN_EXIT = 0;
 
     /**
+     * Every error in a pipe will be exited with an error code
+     */
+    const SET_O_PIPEFAIL = 'set -o pipefail;';
+
+    /**
      * @param string $command
      * @param string|null $output
      * @param int $returnCode
@@ -33,7 +38,11 @@ class Exec
             throw new RuntimeException($message);
         }
 
-        $command = $command . self::REDIRECT_STDERR_TO_STDOUT;
+        if (OperatingSystem::isBashCompatibleShell() && self::isPipefailOptionAvailable()) {
+            $command = self::SET_O_PIPEFAIL . $command;
+        }
+
+        $command .= self::REDIRECT_STDERR_TO_STDOUT;
 
         exec($command, $outputArray, $returnCode);
         $output = self::parseCommandOutput((array) $outputArray);
@@ -64,5 +73,15 @@ class Exec
     private static function parseCommandOutput(array $commandOutput)
     {
         return implode(PHP_EOL, $commandOutput) . PHP_EOL;
+    }
+
+    /**
+     * @return bool
+     */
+    private static function isPipefailOptionAvailable()
+    {
+        exec('set -o | grep pipefail 2>&1', $output, $returnCode);
+
+        return $returnCode == self::CODE_CLEAN_EXIT;
     }
 }

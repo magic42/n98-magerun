@@ -44,10 +44,10 @@ class DatabaseHelper extends AbstractHelper
     /**
      * @param OutputInterface $output
      *
-     * @throws RuntimeException
+     * @param null $connectionNode
      * @return void
      */
-    public function detectDbSettings(OutputInterface $output)
+    public function detectDbSettings(OutputInterface $output, $connectionNode = null)
     {
         if (null !== $this->dbSettings) {
             return;
@@ -65,7 +65,7 @@ class DatabaseHelper extends AbstractHelper
         }
 
         try {
-            $this->dbSettings = new DbSettings($configFile);
+            $this->dbSettings = new DbSettings($configFile, $connectionNode);
         } catch (InvalidArgumentException $e) {
             $output->writeln('<error>' . $e->getMessage() . '</error>');
             throw new RuntimeException('Failed to load database settings from config file', 0, $e);
@@ -281,14 +281,17 @@ class DatabaseHelper extends AbstractHelper
             }
 
             // resolve wildcards
-            if (strpos($entry, '*') !== false) {
+            if (strpos($entry, '*') !== false || strpos($entry, '?') !== false) {
                 $connection = $this->getConnection();
                 $sth = $connection->prepare(
                     'SHOW TABLES LIKE :like',
                     array(PDO::ATTR_CURSOR => PDO::CURSOR_FWDONLY)
                 );
+                $entry = str_replace('_', '\\_', $entry);
+                $entry = str_replace('*', '%', $entry);
+                $entry = str_replace('?', '_', $entry);
                 $sth->execute(
-                    array(':like' => str_replace('*', '%', $this->dbSettings['prefix'] . $entry))
+                    array(':like' => $this->dbSettings['prefix'] . $entry)
                 );
                 $rows = $sth->fetchAll();
                 foreach ($rows as $row) {
